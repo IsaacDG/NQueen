@@ -1,5 +1,4 @@
-import java.util.Arrays;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Created by Isaac on 5/4/2017.
@@ -7,45 +6,138 @@ import java.util.Random;
 public class Program {
 
     public static void main(String[] args){
+        steepestHillClimbTester(21, 200);
+        //System.out.println(geneticAlg(21, 10000, .10f));
+    }
 
-        int[] boardT = {2, 4, 7, 4, 8, 5, 5, 2};
-        System.out.println(attacks(boardT));
+    public static State geneticAlg(int n, int pop, float mr){
+        State[] initPop = new State[pop];
 
-        int n = 21;
+        generatePopulation(initPop, n);
 
-        int solutions = 0;
+        return geneticAlgHelperT(initPop, mr);
+    }
+
+    public static State geneticAlgHelperT(State[] population, float mr){
+
         Random rand = new Random();
-        for(int i = 0; i < 100; i++){
+        State best = population[0];
+
+        while(attacks(best) != 0){
+            State[] newPop = new State[population.length * 2];
+
+            for(int i = 0; i < population.length * 2; i++){
+
+                State child = reproduce(population[rand.nextInt(population.length)], population[rand.nextInt(population.length)]);
+
+                if(rand.nextFloat() <= mr){
+                    child = mutate(child);
+                }
+
+                if(best.fitness < child.fitness){
+                    best = child;
+                    System.out.println(best.getAttacks());
+                }
+                newPop[i] = child;
+            }
+            Arrays.sort(newPop);
+            population = Arrays.copyOf(newPop, population.length);
+        }
+        return best;
+    }
+
+    public static State mutate(State s){
+        Random rand = new Random();
+
+        int[] board = Arrays.copyOf(s.getBoard(), s.getN());
+        int idx = rand.nextInt(board.length);
+
+        boolean mutated = false;
+        while(!mutated){
+            int num = rand.nextInt(board.length);
+            if(board[idx] != num){
+                board[idx] = num;
+                mutated = true;
+            }
+        }
+
+        return new State(board, attacks(board), board.length);
+    }
+
+    public static State reproduce(State x, State y){
+        int n = x.getN();
+
+        Random rand = new Random();
+
+        int c = rand.nextInt(n);
+
+        int[] resBoard = new int[n];
+
+        int[] xBoard = x.getBoard();
+        for(int i = 0; i < c; i++){
+            resBoard[i] = xBoard[i];
+        }
+
+        int[] yBoard = y.getBoard();
+        for(int i = c; i < n; i++){
+            resBoard[i] = yBoard[i];
+        }
+
+        return new State(resBoard, attacks(resBoard), n);
+    }
+
+    public static void generatePopulation(State[] initPop, int n){
+        Random rand = new Random();
+
+        for(int i = 0; i < initPop.length; i++){
+            int[] board = new int[n];
+            for(int j = 0; j < board.length; j++){
+                board[j] = rand.nextInt(n);
+            }
+
+            initPop[i] = new State(board, attacks(board), n);
+        }
+    }
+
+    public static void steepestHillClimbTester(int n, int tests){
+        int solutions = 0;
+        long time = 0;
+        int cost = 0;
+
+        Random rand = new Random();
+        for(int i = 0; i < tests; i++){
             int[] board = new int[n];
 
             for(int j = 0; j < board.length; j++){
                 board[j] = rand.nextInt(8);
             }
 
-            State res = steepestHillClimb(board);
-            if(attacks(res.getBoard()) == 0){
+            TestCase res = steepestHillClimb(board);
+
+            time += res.time;
+            cost += res.searchCost;
+
+            if(solved(res.state)){
                 solutions++;
-                System.out.println("Solution Found!");
-                System.out.println(res);
+                //System.out.println(res.state);
+                //System.out.println("Solution Found!");
             }
 
         }
 
-        System.out.println(((solutions / 100.0) * 100) + "%");
+        System.out.println("Percentage Solved: " + ((solutions / (double)tests) * 100) + "%");
+        System.out.println("Average Running Time(ns): " + time / tests);
+        System.out.println("Average Search Cost: " + cost / tests);
     }
 
-    public static State geneticAlg(int[] board){
-        int totPossiblePairs = board.length * ((board.length - 1) / 2);
-
-        return null;
-    }
-
-    public static State steepestHillClimb(int[] board){
+    public static TestCase steepestHillClimb(int[] board){
         State cur = new State(board, attacks(board), board.length);
         State min = cur;
+        int searchCost = 0;
 
-        boolean stuck = false;
-        while(!stuck){
+        long start = System.nanoTime();
+        while(true){
+            searchCost++;
             int ogAttacks = cur.getAttacks();
             int minAttacks = ogAttacks;
             int[] curBoard = cur.getBoard();
@@ -65,12 +157,12 @@ public class Program {
             }
 
             if(min == cur){
-                return cur;
+                long end = System.nanoTime();
+                return new TestCase(cur, end - start, searchCost);
             } else {
                 cur = min;
             }
         }
-        return cur;
     }
 
     public static boolean solved(State s){
@@ -81,6 +173,10 @@ public class Program {
         int temp = a[x];
         a[x] = a[y];
         a[y] = temp;
+    }
+
+    public static int attacks(State s){
+        return attacks(s.getBoard());
     }
 
     public static int attacks(int[] board){
